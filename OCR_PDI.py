@@ -5,10 +5,11 @@ import cv2
 import pytesseract
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-# Definir o caminho para o executável do Tesseract OCR
+# Definindo o caminho para o executável do Tesseract OCR
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-# Função para carregar IDs e rótulos de um arquivo de texto
+
+# Função para carregar dados de um arquivo .txt
 def load_data_from_txt(file_path):
     img_ids = []
     labels = []
@@ -17,8 +18,10 @@ def load_data_from_txt(file_path):
             if line.startswith('#') or line.strip() == '':
                 continue
             parts = line.strip().split()
-            img_ids.append(parts[0])  # ID da palavra
-            labels.append(parts[1])  # Transcrição da palavra
+            # ID da palavra
+            img_ids.append(parts[0])
+            # Transcrição da palavra
+            labels.append(parts[1])
     return np.array(img_ids), np.array(labels)
 
 
@@ -28,15 +31,23 @@ def load_images_and_labels(img_ids, label_data, img_dir):
     labels = []
     for img_id, label in zip(img_ids, label_data):
         parts = img_id.split('-')
-        if len(parts) >= 2:  # Verificar se o formato do img_id é esperado
+        if len(parts) >= 2:
             img_path = os.path.join(img_dir, parts[0], f"{parts[0]}-{parts[1]}", f"{img_id}.png")
             if os.path.exists(img_path) and img_path.lower().endswith('.png'):
                 try:
                     img = Image.open(img_path)
-                    img = img.convert('L')  # Converter para escala de cinza
-                    img = img.resize((170, 40))  # Redimensionar todas as imagens para o mesmo tamanho
-                    img = np.array(img, dtype='float32')
-                    img = img / 255.0  # Normalizar os valores dos pixels
+                    # Convertendo para escala de cinza
+                    img = img.convert('L')
+                    # Redimensionando as imagens para o mesmo tamanho
+                    img = img.resize((170, 40))
+
+                    # Aplicando filtro Gaussiano para suavização
+                    img = cv2.GaussianBlur(np.array(img), (5, 5), 0)
+
+                    # Aplicando binarização adaptativa
+                    _, img = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                    # Normalizando os valores dos pixels
+                    img = img.astype(np.float32) / 255.0
                     img_data.append(img)
                     labels.append(label)
                 except Exception as e:
@@ -48,21 +59,9 @@ def load_images_and_labels(img_ids, label_data, img_dir):
     return img_data, labels
 
 
-# Função para pré-processar a imagem para OCR
-def prepare_image_ocr(image):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    _, binary_image = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-    return binary_image
-
-
-# Função para executar OCR na imagem pré-processada
+# Função para executar OCR na imagem
 def extract_text_from_image(image):
-    # Pré-processar a imagem
-    processed_image = prepare_image_ocr(image)
-
-    # Executar OCR na imagem processada
-    text = pytesseract.image_to_string(processed_image, lang='eng')
+    text = pytesseract.image_to_string(image, lang='eng')
 
     return text.strip()
 
@@ -70,7 +69,7 @@ def extract_text_from_image(image):
 # Caminhos dos arquivos
 train_txt_path = 'C:/Users/danie/Downloads/Projeto/train.txt'
 img_dir = 'C:/Users/danie/Downloads/Projeto/words'
-output_metrics_path = 'C:/Users/danie/Downloads/Projeto/OCR_results.txt'
+output_metrics_path = 'C:/Users/danie/Downloads/Projeto/OCR_PDI_results.txt'
 
 # Carregando IDs e rótulos
 img_ids, labels = load_data_from_txt(train_txt_path)
@@ -80,7 +79,7 @@ img_data, label_data = load_images_and_labels(img_ids, labels, img_dir)
 
 # Executando OCR nas imagens carregadas
 ocr_results = []
-for i, img_array in enumerate(img_data, 1):  # Adicionando contador para mostrar o progresso
+for i, img_array in enumerate(img_data, 1):
     img_cv = (img_array * 255).astype(np.uint8)
     img_cv = cv2.cvtColor(img_cv, cv2.COLOR_GRAY2BGR)
 
@@ -94,7 +93,6 @@ for i, img_array in enumerate(img_data, 1):  # Adicionando contador para mostrar
 # Exibindo os resultados do OCR
 for original_label, ocr_result in zip(label_data, ocr_results):
     print(f"Rótulo Original: {original_label} | OCR Resultado: {ocr_result}")
-
 
 # Função para calcular métricas de avaliação
 def calculate_metrics(true_labels, predicted_labels):
@@ -114,7 +112,7 @@ print(f"Precisão: {precision:.4f}")
 print(f"Recall: {recall:.4f}")
 print(f"F1 Score: {f1:.4f}")
 
-# Salvando métricas em um arquivo de texto
+# Salvando as métricas em um arquivo de texto
 with open(output_metrics_path, 'w') as f:
     f.write(f"Acurácia: {accuracy:.4f}\n")
     f.write(f"Precisão: {precision:.4f}\n")

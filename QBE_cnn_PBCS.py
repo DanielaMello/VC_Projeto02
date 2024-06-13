@@ -237,6 +237,7 @@ img_data_train, labels_train = prepare_data(img_data_train, labels_train)
 img_data_val, labels_val = prepare_data(img_data_val, labels_val)
 
 # Função para extrair características
+
 def extract_features(model, img_data, device):
     model.eval()
     features = []
@@ -247,9 +248,11 @@ def extract_features(model, img_data, device):
             features.append(output.flatten())
     return np.array(features)
 
+
 # Extrair características de consulta e referência
 query_features = extract_features(model, img_data_val, device)
 ref_features = extract_features(model, img_data_train, device)
+
 
 def calculate_map(query_features, query_labels, ref_features, ref_labels):
     map_score = 0

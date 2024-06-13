@@ -2,18 +2,14 @@ import os
 import random
 import numpy as np
 import torch
-from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.nn as nn
-import torch.optim as optim
 import skimage.transform as sk
-from matplotlib import pyplot as plt
-import csv
 from PIL import Image
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-import representations as rep
 
-# Função para carregar dados de um arquivo words.txt
+
+# Função para carregar dados de um arquivo .txt
 def load_data_from_txt(file_path):
     img_ids = []
     labels = []
@@ -32,17 +28,21 @@ def load_images_and_labels(img_ids, label_data, img_dir):
     img_data = []
     labels = []
     for img_id, label in zip(img_ids, label_data):
-        # Construir o caminho da imagem
+        # Construindo o caminho da imagem
         parts = img_id.split('-')
         if len(parts) >= 2:  # Verificar se o formato do img_id é esperado
             img_path = os.path.join(img_dir, parts[0], f"{parts[0]}-{parts[1]}", f"{img_id}.png")
             if os.path.exists(img_path) and img_path.lower().endswith('.png'):
                 try:
+                    # Carregando imagem
                     img = Image.open(img_path)
-                    img = img.convert('L')  # Converter para escala de cinza
-                    img = img.resize((170, 40))  # Redimensionar todas as imagens para o mesmo tamanho
+                    # Convertendo para escala de cinza
+                    img = img.convert('L')
+                    # Redimensionando as imagens para o mesmo tamanho
+                    img = img.resize((170, 40))
                     img = np.array(img, dtype='float32')
-                    img = img / 255.0  # Normalizar os valores dos pixels
+                    # Normalizando os valores dos pixels
+                    img = img / 255.0
                     img_data.append(img)
                     labels.append(label)
                 except Exception as e:
@@ -60,36 +60,36 @@ alpha_path = 'C:/Users/danie/Downloads/Projeto/alpha.npy'
 labels_path = 'C:/Users/danie/Downloads/Projeto/labels_test_PBSC.npy'
 img_dir = 'C:/Users/danie/Downloads/Projeto/words'
 
-# Verificar se o arquivo txt existe
+# Verificando se o arquivo txt existe
 if not os.path.exists(test_txt_path):
     raise FileNotFoundError(f"O arquivo {test_txt_path} não foi encontrado.")
 
-# Carregar os dados do arquivo test.txt
+# Carregando os dados do arquivo test.txt
 img_ids, lab_data = load_data_from_txt(test_txt_path)
 
-# Carregar os arquivos .npy
+# Carregando os arquivos .npy
 alpha = np.load(alpha_path)
 labels = np.load(labels_path)
 
-# Carregar e preprocessar as imagens
+# Carregando e preprocessando as imagens
 img_data, label_data = load_images_and_labels(img_ids, labels, img_dir)
 
-# Verifique se img_data não está vazio e tenha imagens com o mesmo formato
+# Verificando se img_data não está vazio e as imagens tem o mesmo formato
 if len(img_data) == 0:
     raise ValueError("Nenhuma imagem válida foi encontrada.")
 else:
-    # Verifique se todas as imagens têm o mesmo formato
     img_shape = img_data[0].shape
     for img in img_data:
         if img.shape != img_shape:
             raise ValueError("As imagens carregadas não têm todas o mesmo formato.")
 
-# Converter img_data e label_data para arrays numpy
+# Convertendo img_data e label_data para arrays numpy
 img_data = np.array(img_data)
 label_data = np.array(label_data)
 
-# Verificar a forma dos rótulos
+# Verificando a forma dos rótulos
 print(labels.shape)
+
 
 class modele(nn.Module):
     def __init__(self):
@@ -201,7 +201,8 @@ class modele(nn.Module):
 
         return self.soft(x)
 
-# Verifique se a GPU está disponível
+
+# Verificando se a GPU está disponível
 if torch.cuda.is_available():
     device = torch.device("cuda")
     print("Usando GPU:", torch.cuda.get_device_name(device))
@@ -209,22 +210,18 @@ else:
     device = torch.device("cpu")
     print("Usando CPU")
 
-# Carregar o modelo treinado
+# Carregando o modelo treinado
 model_path = 'C:/Users/danie/Downloads/Projeto/model_cnn_dict_PBSC.pth'
 model = modele().to(device)
 model.load_state_dict(torch.load(model_path))
 model.eval()
 
 img_data_test = img_data[:25000]
-labels_test = labels[:25000, :, :]
+labels_test = labels[:25000]
 del img_data, labels
 
-# Processo de teste
-test_losses = []
-all_preds = []
-all_targets = []
 
-
+# Função para preparar os dados
 def prepare_data(img_data, labels, batch_size=32):
     Xdata = np.zeros((img_data.shape[0], 1, 40, 170), dtype='float32')
     for i, x in enumerate(img_data):
@@ -243,37 +240,50 @@ def prepare_data(img_data, labels, batch_size=32):
 
     return Xdata, Ydata
 
+
 # Preparação dos dados de teste
 img_data_test, labels_test = prepare_data(img_data_test, labels_test)
 
-with torch.no_grad():  # Não há necessidade de calcular gradientes durante o teste
+# Teste do modelo
+test_losses = []
+all_preds = []
+all_targets = []
+
+with torch.no_grad():
     for i in range(int(img_data_test.shape[0] / 32)):
         input = torch.from_numpy(img_data_test[i * 32:(i + 1) * 32, :, :, :]).to(device)
-        target = torch.from_numpy(labels_test[i * 32:(i + 1) * 32]).to(device)  # Ajuste aqui
+        target = torch.from_numpy(labels_test[i * 32:(i + 1) * 32]).to(device)
 
         output = model(input)
         loss = F.binary_cross_entropy(output, target)
 
         test_losses.append(loss.item())
 
-        # Convertendo as saídas do modelo em rótulos binários (0 ou 1) com um limiar de 0.5
         preds = (output > 0.5).float()
         all_preds.append(preds.cpu().numpy())
         all_targets.append(target.cpu().numpy())
 
-# Calcular métricas
+# Calculando métricas
 test_loss = np.mean(test_losses)
 
 all_preds = np.concatenate(all_preds, axis=0).reshape(-1)
 all_targets = np.concatenate(all_targets, axis=0).reshape(-1)
 
-# Considerando que você tem rótulos binários (0 ou 1)
 precision = precision_score(all_targets, all_preds)
 recall = recall_score(all_targets, all_preds)
 f1 = f1_score(all_targets, all_preds)
 accuracy = accuracy_score(all_targets, all_preds)
 
-print(f'Test loss: {test_loss:.4f}')
-print(f'Precision: {precision:.4f}, Recall: {recall:.4f}, F1-score: {f1:.4f}')
-print(f'Accuracy: {accuracy:.4f}')
+print(f'Test loss: {test_loss:.4f}\n')
+print(f'Precision: {precision:.4f}, Recall: {recall:.4f}, F1-score: {f1:.4f}\n')
+print(f'Accuracy: {accuracy:.4f}\n')
+
+# Salvando os resultados em um arquivo de texto
+result_file = 'C:/Users/danie/Downloads/Projeto/test_results.txt'
+with open(result_file, 'w') as f:
+    f.write(f'Test loss: {test_loss:.4f}\n')
+    f.write(f'Precision: {precision:.4f}, Recall: {recall:.4f}, F1-score: {f1:.4f}\n')
+    f.write(f'Accuracy: {accuracy:.4f}\n')
+
+print('Resultados salvos em', result_file)
 

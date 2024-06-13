@@ -13,7 +13,7 @@ from PIL import Image
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import representations as rep
 
-# Função para carregar dados de um arquivo words.txt
+# Função para carregar dados de um arquivo .txt
 def load_data_from_txt(file_path):
     img_ids = []
     labels = []
@@ -22,8 +22,10 @@ def load_data_from_txt(file_path):
             if line.startswith('#') or line.strip() == '':
                 continue
             parts = line.strip().split()
-            img_ids.append(parts[0])  # ID da palavra
-            labels.append(parts[1])  # Transcrição da palavra
+            # ID da palavra
+            img_ids.append(parts[0])
+            # Transcrição da palavra
+            labels.append(parts[1])
     return np.array(img_ids), np.array(labels)
 
 # Função para carregar imagens e converter rótulos
@@ -31,17 +33,21 @@ def load_images_and_labels(img_ids, label_data, img_dir):
     img_data = []
     labels = []
     for img_id, label in zip(img_ids, label_data):
-        # Construir o caminho da imagem
+        # Construindo o caminho da imagem
         parts = img_id.split('-')
-        if len(parts) >= 2:  # Verificar se o formato do img_id é esperado
+        if len(parts) >= 2:
             img_path = os.path.join(img_dir, parts[0], f"{parts[0]}-{parts[1]}", f"{img_id}.png")
             if os.path.exists(img_path) and img_path.lower().endswith('.png'):
                 try:
+                    # Carregando imagem
                     img = Image.open(img_path)
-                    img = img.convert('L')  # Converter para escala de cinza
-                    img = img.resize((170, 40))  # Redimensionar todas as imagens para o mesmo tamanho
+                    # Convertendo para escala de cinza
+                    img = img.convert('L')
+                    # Redimensionando as imagens para o mesmo tamanho
+                    img = img.resize((170, 40))
                     img = np.array(img, dtype='float32')
-                    img = img / 255.0  # Normalizar os valores dos pixels
+                    # Normalizando os valores dos pixels
+                    img = img / 255.0
                     img_data.append(img)
                     labels.append(label)
                 except Exception as e:
@@ -59,35 +65,34 @@ alpha_path = 'C:/Users/danie/Downloads/Projeto/alpha.npy'
 labels_path = 'C:/Users/danie/Downloads/Projeto/labels_PBSC.npy'
 img_dir = 'C:/Users/danie/Downloads/Projeto/words'
 
-# Verificar se o arquivo txt existe
+# Verificando se o arquivo txt existe
 if not os.path.exists(train_txt_path):
     raise FileNotFoundError(f"O arquivo {train_txt_path} não foi encontrado.")
 
-# Carregar os dados do arquivo train.txt
+# Carregando os dados do arquivo train.txt
 img_ids, lab_data = load_data_from_txt(train_txt_path)
 
-# Carregar os arquivos .npy
+# Carregando os arquivos .npy
 alpha = np.load(alpha_path)
 labels = np.load(labels_path)
 
-# Carregar e preprocessar as imagens
+# Carregando e preprocessando as imagens
 img_data, label_data = load_images_and_labels(img_ids, labels, img_dir)
 
-# Verifique se img_data não está vazio e tenha imagens com o mesmo formato
+# Verificando se img_data não está vazio e as imagens tem o mesmo formato
 if len(img_data) == 0:
     raise ValueError("Nenhuma imagem válida foi encontrada.")
 else:
-    # Verifique se todas as imagens têm o mesmo formato
     img_shape = img_data[0].shape
     for img in img_data:
         if img.shape != img_shape:
-            raise ValueError("As imagens carregadas não têm todas o mesmo formato.")
+            raise ValueError("As imagens carregadas não têm o mesmo formato.")
 
-# Converter img_data e label_data para arrays numpy
+# Convertendo img_data e label_data para arrays numpy
 img_data = np.array(img_data)
 label_data = np.array(label_data)
 
-# Verificar a forma dos rótulos
+# Verificando a forma dos rótulos
 print(labels.shape)
 
 
@@ -139,12 +144,10 @@ class modele(nn.Module):
         self.relu31 = nn.ReLU()
         self.bach31 = nn.BatchNorm2d(128)
 
-        # Ajuste do tamanho da camada linear
         self.lin1 = nn.Linear(2176, 2000)
         self.relu1 = nn.ReLU()
         self.bach1 = nn.BatchNorm1d(2000)
 
-        # Ajuste do tamanho da saída final
         self.lin2 = nn.Linear(2000, 48 * 53)
 
         self.soft = nn.Softmax(2)
@@ -201,7 +204,7 @@ class modele(nn.Module):
 
         return self.soft(x)
 
-# Verifique se a GPU está disponível
+# Verificando se a GPU está disponível
 if torch.cuda.is_available():
     device = torch.device("cuda")
     print("Usando GPU:", torch.cuda.get_device_name(device))
@@ -212,12 +215,12 @@ else:
 model = modele().to(device)
 model_path = 'C:/Users/danie/Downloads/Projeto/model_cnn_dict_PBSC.pth'
 
-# Verificar se o modelo já existe
+# Verificando se o modelo já existe
 if os.path.exists(model_path):
     print(f"Carregando modelo existente de {model_path}")
     model.load_state_dict(torch.load(model_path))
 else:
-# Salvar o novo modelo inicial (isso sobrescreverá o modelo existente)
+    # Criando novo modelo inicial
     torch.save(model.state_dict(), model_path)
     print(f"Arquivo de modelo não encontrado em {model_path}. Treinando um novo modelo.")
 
@@ -286,13 +289,10 @@ for ep in range(1000):
     for i in range(int(img_data_val.shape[0] / 32)):
         input = torch.from_numpy(img_data_val[i * 32:(i + 1) * 32, :, :, :]).to(device)
         target = torch.from_numpy(labels_val[i * 32:(i + 1) * 32, :, :]).to(device)
-
         output = model(input)
         loss = F.binary_cross_entropy(output, target)
-
         val_losses.append(loss.item())
 
-        # Convertendo as saídas do modelo em rótulos binários (0 ou 1) com um limiar de 0.5
         preds = (output > 0.5).float()
         all_preds.append(preds.cpu().numpy())
         all_targets.append(target.cpu().numpy())
@@ -301,13 +301,13 @@ for ep in range(1000):
     val_loss = np.mean(val_losses)
 
     # Calculando as métricas de avaliação
-    # all_preds = np.concatenate(all_preds, axis=0).reshape(-1)
-    # all_targets = np.concatenate(all_targets, axis=0).reshape(-1)
+    all_preds = np.concatenate(all_preds, axis=0).reshape(-1)
+    all_targets = np.concatenate(all_targets, axis=0).reshape(-1)
 
-    # precision = precision_score(all_targets, all_preds)
-    # recall = recall_score(all_targets, all_preds)
-    # f1 = f1_score(all_targets, all_preds)
-    # accuracy = accuracy_score(all_targets, all_preds)
+    precision = precision_score(all_targets, all_preds)
+    recall = recall_score(all_targets, all_preds)
+    f1 = f1_score(all_targets, all_preds)
+    accuracy = accuracy_score(all_targets, all_preds)
 
     if val_loss < threshold_valid:
         threshold_valid = val_loss
@@ -315,8 +315,8 @@ for ep in range(1000):
         print(f'Epoch: {ep+1}/1000')
         print(f'Training loss: {train_loss:.4f}')
         print(f'Validation loss: {val_loss:.4f}')
-        # print(f'Precision: {precision:.4f}, Recall: {recall:.4f}, F1-score: {f1:.4f}')
-        # print(f'Accuracy: {accuracy:.4f}')
+        print(f'Precision: {precision:.4f}, Recall: {recall:.4f}, F1-score: {f1:.4f}')
+        print(f'Accuracy: {accuracy:.4f}')
         print(f'New best validation loss: {val_loss:.4f}. Model saved.')
         torch.save(model.state_dict(), 'C:/Users/danie/Downloads/Projeto/model_cnn_dict_PBSC.pth')
         torch.save(model, 'C:/Users/danie/Downloads/Projeto/model_cnn_PBSC.pth')
@@ -326,8 +326,8 @@ for ep in range(1000):
         print(f'Epoch: {ep+1}/1000')
         print(f'Training loss: {train_loss:.4f}')
         print(f'Validation loss: {val_loss:.4f}')
-        # print(f'Precision: {precision:.4f}, Recall: {recall:.4f}, F1-score: {f1:.4f}')
-        # print(f'Accuracy: {accuracy:.4f}')
+        print(f'Precision: {precision:.4f}, Recall: {recall:.4f}, F1-score: {f1:.4f}')
+        print(f'Accuracy: {accuracy:.4f}')
         print(f'Validation loss did not improve. Reducing learning rate to {lr_par:.6f}.')
 
     with open("C:/Users/danie/Downloads/Projeto/losses_cnn_PBSC.csv", 'w') as f:

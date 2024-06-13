@@ -14,6 +14,7 @@ def filter_error_lines(input_file, output_file):
     with open(output_file, 'w') as outfile:
         outfile.writelines(filtered_lines)
 
+
 # Definindo caminho dos arquivos de entrada e saída
 input_file_path = 'C:/Users/danie/Downloads/Projeto/words_original.txt'
 output_file_path = 'C:/Users/danie/Downloads/Projeto/words_filtered.txt'
